@@ -1,0 +1,35 @@
+const { Server } = require('socket.io');
+
+const socketConnection = (server) => {
+  const io = new Server(server, {
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST'],
+    },
+  });
+
+  io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    socket.on('join', (userId) => {
+      socket.join(userId);
+      console.log(`User ${userId} joined`);
+    });
+
+    socket.on('sendMessage', (message) => {
+      const { sender, receiver, content } = message;
+      io.to(receiver).emit('message', {
+        sender,
+        receiver,
+        content,
+        createdAt: new Date(),
+      });
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Client disconnected:', socket.id);
+    });
+  });
+};
+
+module.exports = socketConnection;
