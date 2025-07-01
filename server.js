@@ -37,43 +37,11 @@ if (missingEnv.length > 0) {
   process.exit(1);
 }
 
-connectDB();
-
 const app = express();
 const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json()); // Body parser
-
-// Socket Server Setup
-const io = new Server(server, {
-  cors: {
-    origin: '*', // For development. Use specific URL in production.
-    methods: ['GET', 'POST'],
-  },
-});
-//  Socket.IO Events
-io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
-
-  socket.on('join', (userId) => {
-    socket.join(userId);
-    console.log(`User ${userId} joined`);
-  });
-  socket.on('sendMessage', (message) => {
-    const { sender, receiver, content } = message;
-    io.to(receiver).emit('message', {
-      sender,
-      receiver,
-      content,
-      createdAt: new Date(),
-    });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
-});
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -89,9 +57,20 @@ app.use(notFound);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
 
-const socketConnection = require('./socket/socket');
-socketConnection(server);
+const startServer = async () => {
+  try {
+    await connectDB();
+    const socketConnection = require('./socket/socket');
+    socketConnection(server);
+
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
