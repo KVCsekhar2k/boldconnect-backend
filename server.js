@@ -43,6 +43,12 @@ const server = http.createServer(app);
 app.use(cors());
 app.use(express.json()); // Body parser
 
+// Root API test
+app.get('/', (req, res) => {
+  res.send('API is running...');
+});
+
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
