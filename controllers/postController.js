@@ -1,38 +1,61 @@
 const Post = require('../models/postModel');
-const cloudinary = require('../config/cloudinary'); // if using cloudinary
+const cloudinary = require('../config/cloudinary');
+const compressImage = require('../utils/imageCompressor');
+const compressVideo = require('../utils/videoCompressor');
+const path = require('path');
 
 const createPost = async (req, res) => {
   try {
     const { caption } = req.body;
 
     if (!req.file) {
-      return res.status(400).json({ message: "Image file is required." });
+      return res.status(400).json({ message: "File is required." });
     }
 
-    // OPTIONAL: Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'posts', // optional
-      resource_type: 'image',
-    });
+    let compressedPath = '';
+    let uploadedResult = {};
 
+    // Compress based on file type
+    if (req.file.mimetype.startsWith('image/')) {
+      compressedPath = `uploads/compressed-${Date.now()}-${req.file.filename}`;
+      await compressImage(req.file.path, compressedPath);
+
+      uploadedResult = await cloudinary.uploader.upload(compressedPath, {
+        folder: 'posts',
+        resource_type: 'image',
+      });
+
+    } else if (req.file.mimetype.startsWith('video/')) {
+      compressedPath = `uploads/compressed-${Date.now()}-${req.file.filename}`;
+      await compressVideo(req.file.path, compressedPath);
+
+      uploadedResult = await cloudinary.uploader.upload(compressedPath, {
+        folder: 'posts',
+        resource_type: 'video',
+      });
+
+    } else {
+      return res.status(400).json({ message: "Unsupported file type." });
+    }
+
+    // Create Post Entry
     const post = await Post.create({
       user: req.user._id,
       caption,
-      image: result.secure_url || req.file.path // Fallback to local if needed
+      fileUrl: uploadedResult.secure_url || compressedPath,
+      fileType: req.file.mimetype,
     });
 
     res.status(201).json({
       message: "Post created successfully",
-      post
+      post,
     });
 
   } catch (err) {
     console.error("Error uploading post:", err);
-    res.status(500).json({ message: "Server Error" });
+    res.status(500).json({ message: "Server Error while uploading post." });
   }
 };
-
-
 
 // Get All Posts
 const getAllPosts = async (req, res) => {
