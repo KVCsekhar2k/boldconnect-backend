@@ -1,18 +1,37 @@
 const Post = require('../models/postModel');
+const cloudinary = require('../config/cloudinary'); // if using cloudinary
 
-// Create Post
 const createPost = async (req, res) => {
-  const { caption } = req.body;
-  const image = req.file.path;
+  try {
+    const { caption } = req.body;
 
-  const post = await Post.create({
-    user: req.user._id,
-    caption,
-    image,
-  });
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required." });
+    }
 
-  res.status(201).json(post);
+    // OPTIONAL: Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'posts', // optional
+      resource_type: 'image',
+    });
+
+    const post = await Post.create({
+      user: req.user._id,
+      caption,
+      image: result.secure_url || req.file.path // Fallback to local if needed
+    });
+
+    res.status(201).json({
+      message: "Post created successfully",
+      post
+    });
+
+  } catch (err) {
+    console.error("Error uploading post:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
 };
+
 
 
 // Get All Posts
