@@ -10,64 +10,86 @@ const generateToken = (id) => {
 };
 
 // Register User
-const registerUser = async (req, res) => {
-  const { name, username, email, phone, password } = req.body;
+const registerUser = async (req, res, next) => {
+  try {
+    const { name, username, email, phone, password } = req.body;
 
-  if (!name || !username || !email || !phone || !password) {
-    res.status(400);
-    throw new Error('Please fill all fields');
-  }
+    if (!name || !username || !email || !phone || !password) {
+      res.status(400);
+      throw new Error('Please fill all fields');
+    }
 
-  const userExists = await User.findOne({ email });
-  if (userExists) {
-    res.status(400);
-    throw new Error('User already exists');
-  }
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      res.status(400);
+      throw new Error('User with this email already exists');
+    }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+    const usernameExists = await User.findOne({ username });
+    if (usernameExists) {
+      res.status(400);
+      throw new Error('Username is already taken');
+    }
 
-  const user = await User.create({
-    name,
-    username,
-    email,
-    phone,
-    password: hashedPassword,
-  });
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  if (user) {
-    res.status(201).json({
-      _id: user.id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      token: generateToken(user.id),
+    const user = await User.create({
+      name,
+      username,
+      email,
+      phone,
+      password: hashedPassword,
     });
-  } else {
-    res.status(400);
-    throw new Error('Invalid user data');
+
+    if (user) {
+      res.status(201).json({
+        _id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        token: generateToken(user.id),
+      });
+    } else {
+      res.status(400);
+      throw new Error('Invalid user data');
+    }
+  } catch (error) {
+    next(error);
   }
 };
 
 // Login User
-const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+const loginUser = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
+    const user = await User.findOne({ email });
 
-  if (user && (await bcrypt.compare(password, user.password))) {
-    res.json({
-      _id: user.id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      phone: user.phone,
-      profilePic: user.profilePic,
-      token: generateToken(user.id),
-    });
-  } else {
-    res.status(401);
-    throw new Error('Invalid email or password');
+    if (user && (await bcrypt.compare(password, user.password))) {
+      if (user.isBanned) {
+        res.status(403); // Forbidden
+        throw new Error('This account has been banned.');
+      }
+
+      res.json({
+        _id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        phone: user.phone,
+        bio: user.bio,
+        profilePic: user.profilePic,
+        followers: user.followers,
+        following: user.following,
+        token: generateToken(user.id),
+      });
+    } else {
+      res.status(401);
+      throw new Error('Invalid email or password');
+    }
+  } catch (error) {
+    next(error);
   }
 };
 
